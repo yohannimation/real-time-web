@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE test</title>
+</head>
+<body>
+    <style>
+        .price-up {
+            color: green;
+        }
+
+        .price-down {
+            color: red;
+        }
+    </style>
+
+    <h1>Server-Sent Events</h1>
+    <button onclick="closeConnection()">Close connection</button>
+    <table id="events" border="1">
+        <tr>
+            <th colspan="2">AAPL</th>
+            <th colspan="2">GOOG</th>
+            <th colspan="2">MSFT</th>
+            <th colspan="2">AMZN</th>
+        </tr>
+        <tr>
+            <th>Price</th>
+            <th>Change</th>
+            <th>Price</th>
+            <th>Change</th>
+            <th>Price</th>
+            <th>Change</th>
+            <th>Price</th>
+            <th>Change</th>
+        </tr>
+    </table>
+
+    <script>
+        // Initialise l'EventSource, écoute les mises à jours serveur
+        const eventSource = new EventSource('http://localhost:3000/stream');
+        
+        // Ecoute les messages du serveur
+        eventSource.onmessage = function(event) {
+            const stockData = JSON.parse(event.data);
+
+            // Création de la structure HTML avec les données
+            dataRow = document.createElement("tr");
+            dataRow.classList.add("data-row");
+
+            Object.keys(stockData).forEach(symbol => {
+                const priceCell = document.createElement("td");
+                const changeCell = document.createElement("td");
+
+                priceCell.textContent = stockData[symbol].price
+                changeCell.textContent = stockData[symbol].change
+
+                priceCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
+                changeCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
+
+                dataRow.appendChild(priceCell);
+                dataRow.appendChild(changeCell);
+            });
+
+            document.getElementById("events").appendChild(dataRow);
+        };
+
+        // Log connection error
+        eventSource.onerror = function(event) {
+            window.alert('Connection error');
+            console.log('Error occurred:', event);
+        };
+
+        function closeConnection () {
+            eventSource.close();
+            window.alert("Connection closed :)");
+        }
+    </script>
+</body>
+</html>
