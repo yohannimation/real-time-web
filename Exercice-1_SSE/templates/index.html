@@ -18,6 +18,7 @@
 
     <h1>Server-Sent Events</h1>
     <button onclick="closeConnection()">Close connection</button>
+    <button onclick="reconnection()">Reconnect</button>
     <table id="events" border="1">
         <tr>
             <th colspan="2">AAPL</th>
@@ -38,44 +39,62 @@
     </table>
 
     <script>
-        // Initialise l'EventSource, écoute les mises à jours serveur
-        const eventSource = new EventSource('http://localhost:3000/stream');
-        
-        // Ecoute les messages du serveur
-        eventSource.onmessage = function(event) {
-            const stockData = JSON.parse(event.data);
+        let eventSource = null
 
-            // Création de la structure HTML avec les données
-            dataRow = document.createElement("tr");
-            dataRow.classList.add("data-row");
+        function startConnection () {
+            // Initialise l'EventSource, écoute les mises à jours serveur
+            eventSource = new EventSource('http://localhost:3000/stream');
 
-            Object.keys(stockData).forEach(symbol => {
-                const priceCell = document.createElement("td");
-                const changeCell = document.createElement("td");
+            // Ecoute les messages du serveur
+            eventSource.onmessage = function(event) {
+                const stockData = JSON.parse(event.data);
 
-                priceCell.textContent = stockData[symbol].price
-                changeCell.textContent = stockData[symbol].change
+                // Création de la structure HTML avec les données
+                dataRow = document.createElement("tr");
+                dataRow.classList.add("data-row");
 
-                priceCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
-                changeCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
+                Object.keys(stockData).forEach(symbol => {
+                    const priceCell = document.createElement("td");
+                    const changeCell = document.createElement("td");
 
-                dataRow.appendChild(priceCell);
-                dataRow.appendChild(changeCell);
-            });
+                    priceCell.textContent = stockData[symbol].price
+                    changeCell.textContent = stockData[symbol].change
 
-            document.getElementById("events").appendChild(dataRow);
-        };
+                    priceCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
+                    changeCell.className = stockData[symbol].change >= 0 ? "price-up" : "price-down";
 
-        // Log connection error
-        eventSource.onerror = function(event) {
-            window.alert('Connection error');
-            console.log('Error occurred:', event);
-        };
+                    dataRow.appendChild(priceCell);
+                    dataRow.appendChild(changeCell);
+                });
 
-        function closeConnection () {
-            eventSource.close();
-            window.alert("Connection closed :)");
+                document.getElementById("events").appendChild(dataRow);
+            };
+
+            // Gestion des erreurs de connexion
+            eventSource.onerror = function(event) {
+                window.alert('Connection error');
+                console.log('Error occurred:', event);
+            };
         }
+        
+        // Stop la connexion
+        function closeConnection () {
+            if(eventSource) {
+                eventSource.close();
+                eventSource = null;
+                alert("Connection closed");
+            }
+        }
+
+        // Reconnexion
+        function reconnection () {
+            if(!eventSource) {
+                startConnection();
+                alert("Connection re-established");
+            }
+        }
+
+        startConnection();
     </script>
 </body>
 </html>
