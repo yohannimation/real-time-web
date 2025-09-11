@@ -5,22 +5,10 @@ const app = express();
 
 // Prix initiaux pour simuler des variations
 let stockPrices = {
-    AAPL: {
-        price: 170.0,
-        change: 0
-    },
-    GOOG: {
-        price: 1500.0,
-        change: 0
-    },
-    MSFT: {
-        price: 250.0,
-        change: 0
-    },
-    AMZN: {
-        price: 130.0,
-        change: 0
-    }
+    AAPL: { price: 170.0, change: 0 },
+    GOOG: { price: 1500.0, change: 0 },
+    MSFT: { price: 250.0, change: 0 },
+    AMZN: { price: 130.0, change: 0 }
 };
 
 // Buffer pour stocker les derniers événements SSE
@@ -66,6 +54,7 @@ app.get("/stream", (req, res) => {
         }
     });
 
+    // Fonction qui envoie les événements
     const sendUpdate = () => {
         stockPrices = generateStockData(stockPrices);
         const data = JSON.stringify(stockPrices);
