@@ -23,6 +23,11 @@ let stockPrices = {
     }
 };
 
+// Buffer pour stocker les derniers événements SSE
+const eventBuffer = [];
+let eventCounter = 0; // identifiant unique pour chaque événement
+const MAX_BUFFER = 50;
+
 // Fonction qui génère des cotations boursières aléatoires
 function generateStockData(stockPrices) {
     const data = {};
@@ -38,7 +43,6 @@ function generateStockData(stockPrices) {
             change,
         };
     });
-
     return data;
 }
 
@@ -52,9 +56,27 @@ app.get("/stream", (req, res) => {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no"); // Important pour Nginx/proxies
 
+    const lastEventId = parseInt(req.headers["last-event-id"]) || 0;
+
+    // Envoyer les événements manqués depuis le buffer
+    eventBuffer.forEach(ev => {
+        if (ev.id > lastEventId) {
+            res.write(`id: ${ev.id}\n`);
+            res.write(`data: ${ev.data}\n\n`);
+        }
+    });
+
     const sendUpdate = () => {
         stockPrices = generateStockData(stockPrices);
-        res.write(`data: ${JSON.stringify(stockPrices)}\n\n`);
+        const data = JSON.stringify(stockPrices);
+
+        eventCounter++;
+        // Ajouter au buffer
+        eventBuffer.push({ id: eventCounter, data });
+        if (eventBuffer.length > MAX_BUFFER) eventBuffer.shift();
+
+        res.write(`id: ${eventCounter}\n`);
+        res.write(`data: ${data}\n\n`);
     };
     
     // Envoie des mises à jour toutes les 2 secondes
