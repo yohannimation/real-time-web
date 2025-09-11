@@ -1,29 +1,45 @@
 # WebSocket
-Le style n'a pas été l'objectif de ce projet. J'ai vraiment voulu me concentrer sur l'aspect du WebSocket
+
+> Ce projet met l’accent sur l’implémentation du **WebSocket**. Le style visuel n’a pas été priorisé ; l’objectif est de démontrer le fonctionnement des flux WebSocket.
+
+---
 
 ## Lancer le serveur
 
-- Cloner le repo
+### 1. Cloner le dépôt :
 
-- Installer les packages
-```
-npm i
-```
-
-- Lancer le server
-```
-node server-web-socket.js
+```bash
+    git clone <URL_DU_REPO>
+    cd <NOM_DU_REPO>
 ```
 
-- Ouvrir dans un navigateur le fichier templates/index.html
+### 2. Installer les dépendances :
 
-- Ouvrir une fenêtre de navigation privée avec la même url de sorte à avoir de navigateurs distinct.
+```npm install```
+
+### Lancer le serveur WebSocket :
+
+```node server-web-socket.js```
+
+### Ouvrir le client dans un navigateur :
+
+- Ouvrir le fichier templates/index.html.
+- Pour tester plusieurs clients, ouvrir une fenêtre de navigation privée ou un autre navigateur avec le même fichier.
 
 ## Fonctionnalités
 
-- Un chat dans chaque navigateur permet d'envoyer et de recevoir des messages.
+- Chat en temps réel entre plusieurs navigateurs.
+- Les messages envoyés depuis un navigateur sont retransmis à tous les autres clients connectés.
+- Le serveur affiche dans la console chaque connexion et chaque message reçu.
 
 ## Fonctionnement
 
-Le serveur attend que des connexions se fassent sur l'url WebSocket. Une fois cela, il va écouter les messages entrants pour les rediffuser aux autres clients (autres navigateurs connectés).
-Le navigateur lui a ouvert la connexion WebSocket en se connectant au serveur et écoute les messages du serveur. Il peut lui aussi envoyer des messages à ce serveur.
+- Le serveur WebSocket écoute les connexions entrantes sur le port défini (8080).
+- Lorsqu’un client se connecte :
+    - Le serveur affiche "Nouveau client connecté" dans la console.
+    - Il écoute tous les messages envoyés par ce client.
+    - Chaque message reçu est diffusé à tous les autres clients connectés (broadcast).
+- Côté navigateur :
+    - Le client ouvre une connexion WebSocket avec le serveur.
+    - Il peut envoyer des messages via ```.send()```.
+    - Il écoute les messages entrants via l’événement ```onmessage``` pour les afficher dans la zone de chat.
