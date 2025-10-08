@@ -8,30 +8,60 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const Redis = require('ioredis');
-const redis = new Redis({
-    host: process.env.REDIS_HOST || '127.0.0.1'
+
+/**
+ * |======================|
+ * | Redis                |
+ * |======================|
+ */
+const subscriber = new Redis({host: process.env.REDIS_HOST || '127.0.0.1'});
+const publisher = new Redis({host: process.env.REDIS_HOST || '127.0.0.1'});
+
+const CHANNEL = 'chat_messages';
+
+subscriber.subscribe(CHANNEL, (err, count) => {
+    if (err) {
+        console.error('Erreur abonnement Redis :', err);
+    } else {
+        console.log(`Abonné au canal Redis : ${CHANNEL}`);
+    }
 });
 
-const users = new Map();
+subscriber.on('message', (channel, message) => {
+    if (channel === CHANNEL) {
+        const data = JSON.parse(message);        
 
-// Servir le fichier index.html
+        // Diffuser à tous les clients du salon concerné
+        io.to(data.room).emit('chat message', data);
+    }
+});
+
+/**
+ * |======================|
+ * | Route                |
+ * |======================|
+ */
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Écoute des connexions Socket.IO
+/**
+ * |======================|
+ * | Socket.io            |
+ * |======================|
+ */
 io.on('connection', (socket) => {
     console.log('Un utilisateur est connecté');
 
     // Écoute des connexions pour rejoindre un salon
     socket.on('joinRoom', (joinRoomData) => {
         socket.join(joinRoomData.room);
-        socket.to(joinRoomData.room).emit('message', `${joinRoomData.username} a rejoint la room ${joinRoomData.room}`);
+        io.to(joinRoomData.room).emit('message', `${joinRoomData.username} a rejoint la room ${joinRoomData.room}`);
     });
 
     socket.on('chat message', (chatMessageData) => {
-        console.log(chatMessageData)
-        io.to(chatMessageData.room).emit('chat message', chatMessageData);
+        // Publier sur Redis au lieu d’envoyer directement
+        publisher.publish(CHANNEL, JSON.stringify(chatMessageData));
     })
 
     socket.on('disconnect', () => {
@@ -39,13 +69,11 @@ io.on('connection', (socket) => {
     });
 });
 
-redis.on('connect', () => {
-    console.log('Connecté à Redis');
-});
-redis.on('error', (err) => {
-    console.error('Erreur Redis :', err);
-});
-
+/**
+ * |======================|
+ * | Server               |
+ * |======================|
+ */
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Serveur en écoute sur le port ${PORT}`);

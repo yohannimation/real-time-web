@@ -5,11 +5,24 @@ services:
     ports:
       - "6379:6379"
 
-  node:
+  node1:
     build: .
-    container_name: node-server
+    container_name: node-server-1
     ports:
       - "3000:3000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/usr/src/app
+
+  node2:
+    build: .
+    container_name: node-server-2
+    ports:
+      - "3001:3000"
     depends_on:
       - redis
     environment:
