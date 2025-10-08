@@ -7,6 +7,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const users = new Map();
+
 // Servir le fichier index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -16,8 +18,14 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
     console.log('Un utilisateur est connecté');
 
+    // Écoute des connexions pour rejoindre un salon
+    socket.on('joinRoom', (joinRoomData) => {
+        socket.join(joinRoomData.roomName);
+        socket.to(joinRoomData.roomName).emit('message', `${joinRoomData.userName} a rejoint la room ${joinRoomData.roomName}`);
+    });
+
     socket.on('disconnect', () => {
-        console.log('Un utilisateur est déconnecté');
+    console.log('Un utilisateur est déconnecté');
     });
 });
 
