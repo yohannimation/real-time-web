@@ -67,10 +67,10 @@
                 currentRoomDisplay.textContent = currentRoom;
 
                 joinRoomData = {
-                    'roomName': currentRoom,
-                    'userName': currentUsername
-                }
-                socket.emit('joinRoom', joinRoomData)
+                    'room': currentRoom,
+                    'username': currentUsername
+                };
+                socket.emit('joinRoom', joinRoomData);
 
                 joinSection.classList.add('hidden');
                 chatSection.classList.remove('hidden');
@@ -80,9 +80,18 @@
         // 2. Gérer la soumission du formulaire de chat
         formChat.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (messageInput.value) {
-                // TODO: Émettre un événement 'chat message' vers le serveur
-                // avec le message, le pseudo et le salon actuel.
+            if (
+                messageInput.value
+            ) {
+                currentMessage = messageInput.value;
+
+                chatMessageData = {
+                    'room': currentRoom,
+                    'username': currentUsername,
+                    'message': currentMessage
+                }
+                socket.emit('chat message', chatMessageData)
+
                 messageInput.value = '';
             }
         });
@@ -90,7 +99,7 @@
         // 3. Écouter les messages entrants du serveur
         socket.on('chat message', (data) => {
             const item = document.createElement('li');
-            item.innerHTML = `<strong>${data.username}</strong> (${data.room}) : ${data.message}`;
+            item.innerHTML = `<strong>${data.username == currentUsername ? 'Vous' : data.username}</strong> (${data.room}) : ${data.message}`;
             messages.appendChild(item);
             messages.scrollTop = messages.scrollHeight; // Scroll automatique
         });

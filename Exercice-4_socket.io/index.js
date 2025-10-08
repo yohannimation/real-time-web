@@ -20,9 +20,14 @@ io.on('connection', (socket) => {
 
     // Écoute des connexions pour rejoindre un salon
     socket.on('joinRoom', (joinRoomData) => {
-        socket.join(joinRoomData.roomName);
-        socket.to(joinRoomData.roomName).emit('message', `${joinRoomData.userName} a rejoint la room ${joinRoomData.roomName}`);
+        socket.join(joinRoomData.room);
+        socket.to(joinRoomData.room).emit('message', `${joinRoomData.username} a rejoint la room ${joinRoomData.room}`);
     });
+
+    socket.on('chat message', (chatMessageData) => {
+        console.log(chatMessageData)
+        io.to(chatMessageData.room).emit('chat message', chatMessageData);
+    })
 
     socket.on('disconnect', () => {
     console.log('Un utilisateur est déconnecté');
