@@ -7,6 +7,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const Redis = require('ioredis');
+const redis = new Redis({
+    host: process.env.REDIS_HOST || '127.0.0.1'
+});
+
 const users = new Map();
 
 // Servir le fichier index.html
@@ -32,6 +37,13 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
     console.log('Un utilisateur est déconnecté');
     });
+});
+
+redis.on('connect', () => {
+    console.log('Connecté à Redis');
+});
+redis.on('error', (err) => {
+    console.error('Erreur Redis :', err);
 });
 
 const PORT = process.env.PORT || 3000;
