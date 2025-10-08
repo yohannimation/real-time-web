@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteNinja - Your Digital Notebook</title>
+    <link rel="icon" type="image/x-icon" href="https://static.photos/technology/200x200/42">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            500: '#6366f1',
+                        },
+                        secondary: {
+                            500: '#ec4899',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .note-card {
+            transition: all 0.3s ease;
+            transform-origin: center;
+        }
+        .note-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-12 text-center">
+            <div class="flex justify-center items-center mb-4">
+                <i data-feather="edit" class="text-primary-500 w-12 h-12 mr-3"></i>
+                <h1 class="text-4xl font-bold text-gray-800">Note<span class="text-primary-500">Ninja</span></h1>
+            </div>
+            <p class="text-gray-600 max-w-2xl mx-auto">Your digital scribble pad with superpowers. Capture, organize, and conquer your thoughts!</p>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Add Note Button -->
+            <div class="flex justify-end mb-6">
+                <button onclick="openNoteModal()" class="flex items-center bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
+                    <i data-feather="plus" class="mr-2"></i> New Note
+                </button>
+            </div>
+
+            <table id="notes-container">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Content</th>
+                        <th>Author ID</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Mollitia sed quo distinctio necessitatibus nostrum quasi error facere ipsum sint illo voluptas dignissimos quibusdam laborum eveniet, quod numquam, non architecto praesentium porro magnam rem eum dolores odit? Fugiat beatae exercitationem non omnis corrupti, qui praesentium amet iste quo, commodi, earum asperiores?</td>
+                        <td>10</td>
+                        <td class="flex items-center flex-col">
+                            <button onclick="openNoteModal(1, 'blabla', 2)" class="flex items-center bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">Modifier</button>
+                            <button onclick="" class="flex items-center bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">Supprimer</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </main>
+
+        <!-- Note Modal -->
+        <div id="note-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 mx-4 fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800" id="modal-title">Add New Note</h3>
+                </div>
+                <form id="note-form" onsubmit="handleNoteSubmit(event)">
+                    <input type="hidden" id="note-id">
+                    <div class="mb-4">
+                        <label for="note-title" class="block text-gray-700 mb-2">Title</label>
+                        <input type="text" id="note-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Note title" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="note-content" class="block text-gray-700 mb-2">Content</label>
+                        <textarea id="note-content" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Write your thoughts here..." required></textarea>
+                    </div>
+                    <div class="mb-6">
+                    <label for="note-content" class="block text-gray-700 mb-2">ID Auteur</label>
+                        <input type="text" id="note-author" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Auteur" required>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeNoteModal()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600">Save Note</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const modal = document.getElementById("note-modal");
+        let modalTitleInput = document.getElementById("note-title");
+        let modalContentInput = document.getElementById("note-content");
+        let modalAuthorIdInput = document.getElementById("note-author");
+
+        const openNoteModal = (id = '', content = '', authorId = '') => {
+            modalTitleInput.value = id
+            modalContentInput.value = content
+            modalAuthorIdInput.value = authorId
+
+            modal.classList.remove("hidden");
+        }
+
+        const closeNoteModal = () => {
+            modal.classList.add("hidden");
+
+            modalTitleInput.value = '' 
+            modalContentInput.value = '' 
+            modalAuthorIdInput.value = '' 
+        }
+
+        const handleNoteSubmit = (event) => {
+            event.preventDefault();
+
+            if (
+                modalTitleInput.value &&
+                modalContentInput.value &&
+                modalAuthorIdInput.value
+            ) {
+                const noteData = {
+                    "title": modalTitleInput.value,
+                    "content": modalContentInput.value,
+                    "author": modalAuthorIdInput.value
+                }
+                socket.emit('saveNote', noteData);
+            }
+        }
+
+        socket.on('connect', () => {
+            console.log('Connecté au serveur Socket.IO');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Déconnecté du serveur Socket.IO');
+        });
+    </script>
+</body>
+</html>
