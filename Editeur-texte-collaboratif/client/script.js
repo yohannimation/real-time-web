@@ -14,13 +14,13 @@ document.getElementById('connectBtn').onclick = () => {
 
     socket.on('connect', () => {
         document.getElementById('roomName').textContent = room;
-        log(`✅ Connecté en tant que ${username}`);
+        log(`✅ Connecté en tant que <strong>${username}</strong>`);
 
         document.getElementById('form-connexion').classList.add('d-none')
         document.getElementById('editor').classList.remove('d-none')
     });
 
-    socket.on('notification', (msg) => log(`📢 ${msg}`));
+    socket.on('notification', (msg) => log(`📢 ${msg.message}`));
     socket.on('update', ({ username, data }) => {
         if (data !== lastContent) {
         document.getElementById('text').value = data;
@@ -38,7 +38,7 @@ document.getElementById('disconnectBtn').onclick = () => {
     document.getElementById('form-connexion').classList.remove('d-none')
     document.getElementById('editor').classList.add('d-none')
 
-    log(`🚪 Déconnecté du salon ${room}.`);
+    log(`🚪 Déconnecté du salon <strong>${room}</strong>.`);
 };
 
 const textarea = document.getElementById('text');

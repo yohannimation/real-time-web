@@ -17,8 +17,8 @@ const io = new Server(server, {
 // =======================
 // Données en mémoire
 // =======================
-const users = {};          // socket.id -> { username, room }
-const validTokens = ['12345', 'abcd']; // clés d’accès valides
+const users = {}; // socket.id -> { username, room }
+const roomTokens = {}; // roomName -> token
 let eventCount = 0;
 
 // =======================
@@ -31,23 +31,21 @@ setInterval(() => {
   }, 60 * 1000);
 
 function getStatus() {
-    // Récupérer toutes les rooms (exclure les rooms individuelles = socket.id)
-    const allRooms = Array.from(io.sockets.adapter.rooms.entries());
-
-    const activeRooms = allRooms
-        .filter(([name, members]) => !members.has(name)) // on garde seulement les vraies rooms
-        .map(([name, members]) => ({
+    const allRooms = Array.from(io.sockets.adapter.rooms.entries())
+    .filter(([name, members]) => !members.has(name))
+    .map(([name, members]) => ({
         name,
+        token: roomTokens[name],
         users: Array.from(members).map(socketId => ({
             socketId,
-            username: users[socketId]?.username || 'inconnu'
-        }))
-        }));
+            username: users[socketId]?.username || 'inconnu',
+        })),
+    }));
 
     return {
         activeConnection: io.engine.clientsCount,
         eventPerMinute: eventCount,
-        rooms: activeRooms,
+        rooms: allRooms,
         timestamp: new Date().toISOString(),
     };
 }
@@ -65,42 +63,47 @@ app.use('/client', express.static(path.join(__dirname, '../client')));
 // Gestion Socket.IO
 // =======================
 io.on('connection', (socket) => {
-    const query = url.parse(socket.handshake.url, true).query;
-    const { username, room, token } = query;
+    const { username, room, token } = socket.handshake.query;
 
-    // --- Vérif. sécurité ---
-    if (!validTokens.includes(token)) {
-        console.log(`Connexion refusée: token invalide (${username})`);
-        socket.disconnect(true);
+    console.log('Nouvelle connexion:', socket.id);
+
+    if (!username || !room || !token) {
+        socket.emit('notification', { message: 'Informations incomplètes.' });
+        socket.disconnect();
         return;
     }
 
-    // --- Connexion et room ---
+    if (!roomTokens[room]) {
+        roomTokens[room] = token;
+        console.log(`🆕 Room "${room}" créée avec token "${token}"`);
+    } else if (roomTokens[room] !== token) {
+        console.log(`❌ Mauvais token pour la room "${room}"`);
+        socket.emit('notification', { message: 'Token invalide pour cette room.' });
+        socket.disconnect();
+        return;
+    }
+
     users[socket.id] = { username, room };
     socket.join(room);
 
-    // Notification globale dans la room
-    io.to(room).emit('notification', `${username} a rejoint ${room}`);
+    io.to(room).emit('notification', { message: `<strong>${username}</strong> a rejoint la room.` });
 
-    console.log(`${username} connecté à ${room}`);
-    eventCount++;
+    // Déconnexion
+    socket.on('disconnect', () => {
+        console.log(`${username} s’est déconnecté de ${room}`);
+        delete users[socket.id];
+        io.to(room).emit('notification', { message: `<strong>${username}</strong> a quitté la room.` });
+    });
 
-    // --- Collaboration en temps réel ---
+    // Mise à jour
     socket.on('update', (data) => {
         eventCount++;
-        // Réémet aux autres clients de la même room
-        socket.to(room).emit('update', { username, data });
-    });
-
-    // --- Déconnexion ---
-    socket.on('disconnect', () => {
         const user = users[socket.id];
-        if (user) {
-        io.to(user.room).emit('notification', `${user.username} a quitté ${user.room}`);
-        delete users[socket.id];
-        console.log(`${user.username} déconnecté`);
+        if (user && user.room) {
+            io.to(user.room).emit('update', { username: user.username, data });
         }
     });
+    
 });
 
 // =======================
