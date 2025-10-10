@@ -1,19 +1,23 @@
 let socket;
 let lastContent = '';
 
+let username, room, token;
+
 document.getElementById('connectBtn').onclick = () => {
-    const username = document.getElementById('username').value || 'Anonyme';
-    const room = document.getElementById('room').value || 'default';
-    const token = document.getElementById('token').value || '12345';
+    username = document.getElementById('username').value || 'Anonyme';
+    room = document.getElementById('room').value || 'default';
+    token = document.getElementById('token').value || '12345';
 
     socket = io(`http://localhost:3000`, {
         query: { username, room, token },
     });
 
     socket.on('connect', () => {
-        document.getElementById('editor').style.display = 'block';
         document.getElementById('roomName').textContent = room;
         log(`✅ Connecté en tant que ${username}`);
+
+        document.getElementById('form-connexion').classList.add('d-none')
+        document.getElementById('editor').classList.remove('d-none')
     });
 
     socket.on('notification', (msg) => log(`📢 ${msg}`));
@@ -26,6 +30,17 @@ document.getElementById('connectBtn').onclick = () => {
     });
 };
 
+document.getElementById('disconnectBtn').onclick = () => {
+    socket.emit('leaveRoom');
+    socket.disconnect();
+
+    document.getElementById('text').value = '';
+    document.getElementById('form-connexion').classList.remove('d-none')
+    document.getElementById('editor').classList.add('d-none')
+
+    log(`🚪 Déconnecté du salon ${room}.`);
+};
+
 const textarea = document.getElementById('text');
 textarea.addEventListener('input', () => {
     const newValue = textarea.value;
@@ -35,6 +50,6 @@ textarea.addEventListener('input', () => {
 
 function log(message) {
     const logDiv = document.getElementById('log');
-    logDiv.innerHTML += `<div>${message}</div>`;
+    logDiv.innerHTML += `<li class="list-group-item">${message}</li>`;
     logDiv.scrollTop = logDiv.scrollHeight;
 }
