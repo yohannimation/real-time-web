@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' },
+    cors: { origin: '*' },
 });
 
 // =======================
@@ -25,19 +25,35 @@ let eventCount = 0;
 // Monitoring basique
 // =======================
 setInterval(() => {
-    console.log('--- STATUS ---');
-    console.log('Connexions actives:', io.engine.clientsCount);
-    console.log('Événements/minute:', eventCount);
-    console.log('Rooms actives:', Array.from(io.sockets.adapter.rooms.keys()));
-    console.log('----------------');
+    const status = getStatus();
+    console.log(JSON.stringify(status, null, 2));
     eventCount = 0;
-}, 60 * 1000);
+  }, 60 * 1000);
+
+function getStatus() {
+    // Récupérer toutes les rooms (exclure les rooms individuelles = socket.id)
+    const allRooms = Array.from(io.sockets.adapter.rooms.entries());
+
+    const activeRooms = allRooms
+        .filter(([name, members]) => !members.has(name)) // on garde seulement les vraies rooms
+        .map(([name, members]) => ({
+        name,
+        users: Array.from(members).map(socketId => ({
+            socketId,
+            username: users[socketId]?.username || 'inconnu'
+        }))
+        }));
+
+    return {
+        activeConnection: io.engine.clientsCount,
+        eventPerMinute: eventCount,
+        rooms: activeRooms,
+        timestamp: new Date().toISOString(),
+    };
+}
 
 app.get('/status', (req, res) => {
-    res.json({
-        activeConnections: io.engine.clientsCount,
-        rooms: Array.from(io.sockets.adapter.rooms.keys()),
-    });
+    res.json(getStatus());
 });
 
 // =======================
