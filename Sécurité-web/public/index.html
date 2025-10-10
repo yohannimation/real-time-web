@@ -63,7 +63,7 @@
                 </button>
             </div>
 
-            <table id="notes-container">
+            <table>
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -72,14 +72,14 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="notes-container">
                     <tr>
                         <td>1</td>
                         <td>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Mollitia sed quo distinctio necessitatibus nostrum quasi error facere ipsum sint illo voluptas dignissimos quibusdam laborum eveniet, quod numquam, non architecto praesentium porro magnam rem eum dolores odit? Fugiat beatae exercitationem non omnis corrupti, qui praesentium amet iste quo, commodi, earum asperiores?</td>
                         <td>10</td>
                         <td class="flex items-center flex-col">
-                            <button onclick="openNoteModal(1, 'blabla', 2)" class="flex items-center bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">Modifier</button>
-                            <button onclick="" class="flex items-center bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">Supprimer</button>
+                            <button>Modifier</button>
+                            <button>Supprimer</button>
                         </td>
                     </tr>
                 </tbody>
@@ -119,7 +119,10 @@
     <script>
         const socket = io();
 
+        // Elements
         const modal = document.getElementById("note-modal");
+        const notesContainer = document.getElementById('notes-container');
+        const addForm = document.getElementById('note-form');
         let modalTitleInput = document.getElementById("note-title");
         let modalContentInput = document.getElementById("note-content");
         let modalAuthorIdInput = document.getElementById("note-author");
@@ -140,30 +143,137 @@
             modalAuthorIdInput.value = '' 
         }
 
-        const handleNoteSubmit = (event) => {
-            event.preventDefault();
-
-            if (
-                modalTitleInput.value &&
-                modalContentInput.value &&
-                modalAuthorIdInput.value
-            ) {
-                const noteData = {
-                    "title": modalTitleInput.value,
-                    "content": modalContentInput.value,
-                    "author": modalAuthorIdInput.value
-                }
-                socket.emit('saveNote', noteData);
+        // Récupérer et afficher la liste des notes (initial)
+        async function fetchNotesAndRender() {
+            try {
+                const res = await fetch('/notes');
+                const notes = await res.json();
+                renderNotes(notes);
+            } catch (err) {
+                console.error('Erreur fetch notes', err);
             }
         }
 
-        socket.on('connect', () => {
-            console.log('Connecté au serveur Socket.IO');
+        // Render
+        function renderNotes(notes) {
+            notesContainer.innerHTML = '';
+            if (!notes || notes.length === 0) {
+                notesContainer.innerHTML = '<p>Aucune note.</p>';
+                return;
+            }
+
+            notes.slice().reverse().forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'note';
+                const left = document.createElement('div');
+                left.style.flex = '1';
+                const content = document.createElement('div');
+                content.className = 'content';
+                content.textContent = note.content;
+
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                meta.textContent = `id: ${note.id} — auteur: ${note.authorId ?? 'anonymous'} — mis à jour: ${new Date(note.updatedAt).toLocaleString()}`;
+
+                left.appendChild(content);
+                left.appendChild(meta);
+
+                const actions = document.createElement('div');
+
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Modifier';
+                editBtn.onclick = () => editNote(note);
+
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Supprimer';
+                delBtn.onclick = () => deleteNote(note.id);
+
+                actions.appendChild(editBtn);
+                actions.appendChild(delBtn);
+
+                div.appendChild(left);
+                div.appendChild(actions);
+
+                notesContainer.appendChild(div);
+            });
+        }
+
+        // Add note
+        addForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const content = newContentEl.value.trim();
+            if (!content) return alert('Écris quelque chose avant d\'ajouter.');
+
+            try {
+                const res = await fetch('/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erreur lors de l\'ajout');
+                }
+                newContentEl.value = '';
+                // On ne rafraîchit pas ici car le serveur va émettre 'notes_updated'
+            } catch (err) {
+                console.error(err);
+                alert('Erreur: ' + err.message);
+            }
         });
 
-        socket.on('disconnect', () => {
-            console.log('Déconnecté du serveur Socket.IO');
+        // Edit note (simple prompt)
+        async function editNote(note) {
+            const newContent = prompt('Modifier la note', note.content);
+            if (newContent === null) return; // cancel
+
+            const trimmed = newContent.trim();
+            if (trimmed === '') return alert('Le contenu ne peut pas être vide.');
+
+            try {
+                const res = await fetch('/notes/' + encodeURIComponent(note.id), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: trimmed })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erreur lors de la modification');
+                }
+                // Le rafraîchissement sera géré via socket
+            } catch (err) {
+                console.error(err);
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        // Delete note
+        async function deleteNote(id) {
+            if (!confirm('Supprimer cette note ?')) return;
+
+            try {
+                const res = await fetch('/notes/' + encodeURIComponent(id), {
+                    method: 'DELETE'
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erreur lors de la suppression');
+                }
+                // Le rafraîchissement sera géré via socket
+            } catch (err) {
+                console.error(err);
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        // Socket: écoute les mises à jour
+        socket.on('notes_updated', (notes) => {
+            renderNotes(notes);
         });
+
+        // Au chargement initial, on récupère la liste (au cas où la socket ne l'a pas encore fournie)
+        fetchNotesAndRender();
     </script>
 </body>
 </html>
