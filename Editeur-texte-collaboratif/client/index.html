@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Collaboration temps réel</title>
+    <style>
+        body { font-family: sans-serif; padding: 1em; }
+        textarea { width: 100%; height: 200px; }
+        #log { background: #f0f0f0; padding: 0.5em; height: 100px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>Éditeur collaboratif</h1>
+
+    <input id="username" placeholder="Pseudo">
+    <input id="room" placeholder="Room (ex: projetX)">
+    <input id="token" placeholder="Token (ex: 12345)">
+    <button id="connectBtn">Connexion</button>
+
+    <div id="editor" style="display:none;">
+        <p><b>Room :</b> <span id="roomName"></span></p>
+        <textarea id="text"></textarea>
+        <div id="log"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
