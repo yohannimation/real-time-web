@@ -1,113 +1,159 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: '*' } });
 
-// Middlewares
-app.use(cors());
-app.use(express.json()); // parse JSON bodies
-app.use(express.static('public')); // sert index.html et les assets depuis /public
-
-// Port
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+const SALT_ROUNDS = 10;
 
-// In-memory storage pour les notes
-// Chaque note : { id: string, content: string, authorId: string|null, createdAt: ISOString, updatedAt: ISOString }
-let notes = [];
-let nextId = 1;
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
 
-// Helper pour émettre la liste mise à jour à tous les clients
+// In-memory storage
+const users = []; // { id, username, passwordHash }
+const notes = []; // { id, content, authorId }
+
+// Helper to broadcast all notes to clients
 function broadcastNotes() {
     io.emit('notes_updated', notes);
 }
 
-// Socket.io connection
-io.on('connection', (socket) => {
-    console.log('Client connecté', socket.id);
-    // Envoie initial des notes au nouveau client
-    socket.emit('notes_updated', notes);
+// ----------------------
+// Middleware d'authentification
+// ----------------------
+function authMiddleware(req, res, next) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing token' });
+    }
+    const token = auth.slice(7);
+    try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        req.userId = payload.userId;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+}
 
-    socket.on('disconnect', () => {
-        console.log('Client déconnecté', socket.id);
-    });
-});
+// ----------------------
+// Routes publiques
+// ----------------------
 
-// Routes REST pour la gestion des notes
-
-// GET /notes - retourne toutes les notes
+// Récupérer toutes les notes
 app.get('/notes', (req, res) => {
     res.json(notes);
 });
 
-// POST /notes - ajoute une nouvelle note
-app.post('/notes', (req, res) => {
-    const { content, authorId = null } = req.body;
-    if (typeof content !== 'string' || content.trim() === '') {
-        return res.status(400).json({ error: 'content is required and must be a non-empty string' });
-    }
+// Inscription
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password)
+        return res.status(400).json({ error: 'username and password required' });
+    if (users.find((u) => u.username === username))
+        return res.status(400).json({ error: 'username already taken' });
 
-    const now = new Date().toISOString();
-    const newNote = {
-        id: String(nextId++),
-        content: content.trim(),
-        authorId,
-        createdAt: now,
-        updatedAt: now
-    };
-    notes.push(newNote);
-
-    // Broadcast
-    broadcastNotes();
-
-    res.status(201).json(newNote);
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const user = { id: uuidv4(), username, passwordHash: hash };
+    users.push(user);
+    res.json({ message: 'registered' });
 });
 
-// PUT /notes/:id - met à jour une note existante
-app.put('/notes/:id', (req, res) => {
-    const id = req.params.id;
-    const { content, authorId } = req.body;
+// Connexion
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+    const user = users.find((u) => u.username === username);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const idx = notes.findIndex(n => n.id === id);
-    if (idx === -1) {
-        return res.status(404).json({ error: 'Note not found' });
-    }
-
-    if (typeof content === 'string') {
-        notes[idx].content = content.trim();
-    }
-    if (typeof authorId !== 'undefined') {
-        notes[idx].authorId = authorId;
-    }
-    notes[idx].updatedAt = new Date().toISOString();
-
-    // Broadcast
-    broadcastNotes();
-
-    res.json(notes[idx]);
+    const token = jwt.sign(
+        { userId: user.id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: '12h' }
+    );
+    res.json({ token });
 });
 
-// DELETE /notes/:id - supprime une note
-app.delete('/notes/:id', (req, res) => {
-    const id = req.params.id;
-    const idx = notes.findIndex(n => n.id === id);
-    if (idx === -1) {
-        return res.status(404).json({ error: 'Note not found' });
-    }
+// ----------------------
+// Routes protégées
+// ----------------------
 
-    const removed = notes.splice(idx, 1)[0];
-
-    // Broadcast
+// Création de note
+app.post('/notes', authMiddleware, (req, res) => {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: 'content required' });
+    const note = { id: uuidv4(), content, authorId: req.userId };
+    notes.push(note);
     broadcastNotes();
-
-    res.json({ success: true, removed });
+    res.status(201).json(note);
 });
 
+// Mise à jour de note
+app.put('/notes/:id', authMiddleware, (req, res) => {
+    const { id } = req.params;
+    const { content } = req.body;
+    const note = notes.find((n) => n.id === id);
+    if (!note) return res.status(404).json({ error: 'note not found' });
+    if (note.authorId !== req.userId)
+        return res.status(403).json({ error: "You don't own this note" });
+    if (typeof content === 'string') note.content = content;
+    broadcastNotes();
+    res.json(note);
+});
+
+// Suppression de note
+app.delete('/notes/:id', authMiddleware, (req, res) => {
+    const { id } = req.params;
+    const idx = notes.findIndex((n) => n.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'note not found' });
+    if (notes[idx].authorId !== req.userId)
+        return res.status(403).json({ error: "You don't own this note" });
+    const [deleted] = notes.splice(idx, 1);
+    broadcastNotes();
+    res.json({ message: 'deleted', deleted });
+});
+
+// Info utilisateur (optionnel)
+app.get('/me', authMiddleware, (req, res) => {
+    const user = users.find((u) => u.id === req.userId);
+    if (!user) return res.status(404).json({ error: 'user not found' });
+    res.json({ id: user.id, username: user.username });
+});
+
+// ----------------------
+// Socket.IO
+// ----------------------
+io.on('connection', (socket) => {
+    const token = socket.handshake?.auth?.token;
+    if (token) {
+        try {
+                const payload = jwt.verify(token, JWT_SECRET);
+                socket.userId = payload.userId;
+                socket.username = payload.username;
+        } catch (err) {
+                console.warn('Socket connection with invalid token');
+        }
+    }
+
+    // Envoi initial
+    socket.emit('notes_updated', notes);
+
+    socket.on('disconnect', () => {});
+});
+
+// ----------------------
 // Démarrage du serveur
-server.listen(PORT, () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
-});
+// ----------------------
+server.listen(PORT, () =>
+    console.log(`✅ Serveur en ligne : http://localhost:${PORT}`)
+);
