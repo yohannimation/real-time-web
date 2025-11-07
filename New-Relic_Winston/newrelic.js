@@ -9,11 +9,11 @@ exports.config = {
   /**
    * Array of application names.
    */
-  app_name: ['exo-real-time-web'],
+  app_name: [''],
   /**
    * Your New Relic license key.
    */
-  license_key: 'eu01xx082c9dca25292abb6cd74128afFFFFNRAL',
+  license_key: '',
   logging: {
     /**
      * Level at which to log. 'trace' is most useful to New Relic when diagnosing
