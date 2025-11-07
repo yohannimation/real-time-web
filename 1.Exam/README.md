@@ -4,6 +4,7 @@
 
 - Completer le fichier ```.env```
 - Executer ```node db.js``` pour creer la base de données
+- Quitter le script et lancer le serveur : ```node index.js```
 
 ## 1. Architecture logique
 
