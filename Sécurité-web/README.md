@@ -10,6 +10,8 @@ cd <project>
 npm install
 ```
 
+> Renomme le fichier `.env.dist` en `.env` et ajoute une clé JWT.
+
 ### 2️⃣ Lancement du serveur
 
 ```bash

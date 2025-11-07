@@ -4,15 +4,19 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+dotenv.config();
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = 'mykey';
+const JWT_SECRET = process.env.JWT_KEY;
 const SALT_ROUNDS = 10;
+
+console.log(JWT_SECRET)
 
 app.use(cors());
 app.use(express.json());
