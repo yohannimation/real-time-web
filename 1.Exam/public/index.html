@@ -248,9 +248,16 @@ async function updateUI() {
     }
 }
 
+function measureLatency() {
+    if (!socket) return;
+    const startTime = Date.now();
+    socket.emit('ping', startTime);
+}
+
 // Initialisation
 fetchNotes();
 updateUI();
 connectSocket();
+setInterval(measureLatency, 10000);
 
 </script>

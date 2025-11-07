@@ -35,19 +35,34 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+let eventCount = 0; // Event per minutes
+const users = {};   // mapping socketId => { username, userId, lastPing }
+
 // Helper to broadcast all notes to clients
 async function broadcastNotes() {
     try {
-        // Get all notes
-        const [rows] = await pool.query(
-            'SELECT id, content, authorId FROM notes ORDER BY id DESC'
-        );
-
-        // Send it to all connected users
+        const [rows] = await pool.query('SELECT id, content, authorId FROM notes ORDER BY id DESC');
         io.emit('notes_updated', rows);
+        eventCount++;
+        console.log(`Broadcast ${rows.length} notes`);
     } catch (err) {
         console.error('Broadcast error :', err);
     }
+}
+
+function getStatus() {
+    const userStatus = Object.values(users).map(u => ({
+        username: u.username,
+        userId: u.userId,
+        latencyMs: u.lastPing
+    }));
+
+    return {
+        activeConnections: io.engine.clientsCount,
+        eventPerMinute: eventCount,
+        users: userStatus,
+        timestamp: new Date().toISOString(),
+    };
 }
 
 // ----------------------
@@ -71,6 +86,11 @@ function authMiddleware(req, res, next) {
 // ----------------------
 // Public routes
 // ----------------------
+
+// Connection status
+app.get('/status', (req, res) => {
+    res.json(getStatus());
+});
 
 // Get all notes
 app.get('/notes', async (req, res) => {
@@ -227,14 +247,19 @@ io.on('connection', async (socket) => {
         try {
             const payload = jwt.verify(token, JWT_SECRET);
             socket.userId = payload.userId;
-            socket.username = payload.username;
-            user = { id: payload.userId, username: payload.username };
+            socket.username = payload.username;users[socket.id] = { username: payload.username, userId: payload.userId, lastPing: null };
         } catch (err) {
             console.warn('Invalid token');
         }
     } else {
         console.log('Connection with no token');
     }
+
+    // --- Latency measurement ---
+    socket.on('ping', (startTime) => {
+        const latency = Date.now() - startTime;
+        if (users[socket.id]) users[socket.id].lastPing = latency;
+    });
 
     try {
         const [rows] = await pool.query(
