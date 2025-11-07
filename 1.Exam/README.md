@@ -1,5 +1,10 @@
 # Mini-Application Web Temps Réel
 
+## Installation 
+
+- Completer le fichier ```.env```
+- Executer ```node db.js``` pour creer la base de données
+
 ## 1. Architecture logique
 
 L’architecture de l’application repose sur un modèle client-serveur temps réel :
